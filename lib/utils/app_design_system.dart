@@ -204,7 +204,7 @@ class AppDesignSystem {
     required BuildContext context,
   }) {
     return Container(
-      height: 70,
+      height: 80, // Increased height for better spacing
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
@@ -214,59 +214,72 @@ class AppDesignSystem {
           // Main navigation items
           Row(
             children: [
-              // Left side items
+              // Left side items - now with more balanced spacing
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(
-                      icon: Icons.calendar_today_outlined,
-                      label: 'Attendance',
-                      isSelected: currentIndex == 0,
-                      onTap: () => onTap(0),
-                    ),
-                    _buildNavItem(
-                      icon: Icons.assessment_outlined,
-                      label: 'Assessment',
-                      isSelected: currentIndex == 1,
-                      onTap: () => onTap(1),
-                    ),
-                  ],
+                child: Container(
+                  margin: const EdgeInsets.only(
+                    right: 28,
+                  ), // Added margin to push items left
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildNavItem(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Attendance',
+                        isSelected: currentIndex == 0,
+                        onTap: () => onTap(0),
+                      ),
+                      _buildNavItem(
+                        icon: Icons.assessment_outlined,
+                        label: 'Assessment',
+                        isSelected: currentIndex == 1,
+                        onTap: () => onTap(1),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 
-              // Right side items
+              // Right side items - now with more balanced spacing
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildNavItem(
-                      icon: Icons.chat_outlined,
-                      label: 'Chat',
-                      isSelected: currentIndex == 3,
-                      onTap: () => onTap(3),
-                    ),
-                    _buildNavItem(
-                      icon: Icons.settings,
-                      label: 'Settings',
-                      isSelected: currentIndex == 4,
-                      onTap: () => onTap(4),
-                    ),
-                  ],
+                child: Container(
+                  margin: const EdgeInsets.only(
+                    left: 28,
+                  ), // Added margin to push items right
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildNavItem(
+                        icon: Icons.chat_outlined,
+                        label: 'Chat',
+                        isSelected: currentIndex == 3,
+                        onTap: () => onTap(3),
+                      ),
+                      _buildNavItem(
+                        icon: Icons.settings,
+                        label: 'Settings',
+                        isSelected: currentIndex == 4,
+                        onTap: () => onTap(4),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
 
-          // Center button
+          // Center button - adjusted positioning
           Center(
             child: Transform.translate(
-              offset: const Offset(0, -20),
+              offset: const Offset(
+                0,
+                -24,
+              ), // Slightly higher to accommodate new height
               child: GestureDetector(
                 onTap: () => onTap(2),
                 child: Container(
-                  width: 56,
-                  height: 56,
+                  width: 60, // Slightly larger
+                  height: 60, // Slightly larger
                   decoration: BoxDecoration(
                     color: currentIndex == 2 ? AppColors.primary : Colors.white,
                     shape: BoxShape.circle,
@@ -299,6 +312,7 @@ class AppDesignSystem {
     );
   }
 
+  // Updated _buildNavItem with better spacing
   static Widget _buildNavItem({
     required IconData icon,
     required String label,
@@ -310,21 +324,27 @@ class AppDesignSystem {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          padding: const EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: 8,
+          ), // Reduced horizontal padding
+          constraints: const BoxConstraints(
+            minWidth: 56,
+          ), // Minimum width for each item
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                size: 24,
+                size: 22, // Slightly smaller icon
                 color: isSelected ? AppColors.primary : Colors.grey.shade600,
               ),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11, // Slightly smaller font
                   color: isSelected ? AppColors.primary : Colors.grey.shade600,
                 ),
               ),
