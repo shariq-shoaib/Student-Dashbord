@@ -1,7 +1,6 @@
 // lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import '../utils/app_design_system.dart';
-import '../utils/theme.dart';
 import 'attendance_screen.dart';
 import 'assessments_screen.dart';
 import 'chat_rooms_screen.dart';

@@ -16,7 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
-  String _selectedLanguage = 'English';
+  // Removed unused _selectedLanguage field
   String _selectedLogoutTime = '30 minutes';
 
   final List<String> _logoutTimes = [

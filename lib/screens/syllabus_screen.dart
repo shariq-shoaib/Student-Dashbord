@@ -52,6 +52,8 @@ class SyllabusScreen extends StatelessWidget {
     ),
   ];
 
+  SyllabusScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -249,8 +251,8 @@ class PdfViewerScreen extends StatelessWidget {
   const PdfViewerScreen({
     required this.pdfPath,
     required this.subjectName,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
