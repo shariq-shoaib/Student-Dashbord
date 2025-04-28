@@ -5,6 +5,8 @@ import 'attendance_screen.dart';
 import 'chat_rooms_screen.dart';
 import 'syllabus_screen.dart';
 import 'assessments_screen.dart';
+import 'timetable_screen.dart';
+import 'announcements_screen.dart';
 
 class HomeScreenContent extends StatelessWidget {
   const HomeScreenContent({super.key});
@@ -287,7 +289,14 @@ class HomeScreenContent extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TimetableScreen(),
+                    ),
+                  );
+                },
                 child: Text(
                   'View All',
                   style: TextStyle(color: AppColors.primary),
@@ -402,7 +411,14 @@ class HomeScreenContent extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AnnouncementsScreen(),
+                    ),
+                  );
+                },
                 child: Text(
                   'View All',
                   style: TextStyle(color: AppColors.primary),
