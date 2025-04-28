@@ -1,6 +1,8 @@
 // lib/utils/app_design_system.dart
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'badge_helper.dart';
+import '../services/notification_service.dart';
 
 class AppDesignSystem {
   // App-wide padding constants
@@ -202,9 +204,15 @@ class AppDesignSystem {
     required int currentIndex,
     required ValueChanged<int> onTap,
     required BuildContext context,
+    Map<String, int>? notificationCounts,
   }) {
+    // Initialize notification counts if not provided
+    final counts =
+        notificationCounts ??
+        {'attendance': 0, 'assessment': 0, 'chat': 0, 'settings': 0};
+
     return Container(
-      height: 80, // Increased height for better spacing
+      height: 80,
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
@@ -214,12 +222,10 @@ class AppDesignSystem {
           // Main navigation items
           Row(
             children: [
-              // Left side items - now with more balanced spacing
+              // Left side items
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.only(
-                    right: 28,
-                  ), // Added margin to push items left
+                  margin: const EdgeInsets.only(right: 28),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -227,25 +233,35 @@ class AppDesignSystem {
                         icon: Icons.calendar_today_outlined,
                         label: 'Attendance',
                         isSelected: currentIndex == 0,
-                        onTap: () => onTap(0),
+                        onTap: () {
+                          NotificationService().clearNotifications(
+                            'attendance',
+                          );
+                          onTap(0);
+                        },
+                        badgeCount: counts['attendance'] ?? 0,
                       ),
                       _buildNavItem(
                         icon: Icons.assessment_outlined,
                         label: 'Assessment',
                         isSelected: currentIndex == 1,
-                        onTap: () => onTap(1),
+                        onTap: () {
+                          NotificationService().clearNotifications(
+                            'assessment',
+                          );
+                          onTap(1);
+                        },
+                        badgeCount: counts['assessment'] ?? 0,
                       ),
                     ],
                   ),
                 ),
               ),
 
-              // Right side items - now with more balanced spacing
+              // Right side items
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.only(
-                    left: 28,
-                  ), // Added margin to push items right
+                  margin: const EdgeInsets.only(left: 28),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
@@ -253,13 +269,21 @@ class AppDesignSystem {
                         icon: Icons.chat_outlined,
                         label: 'Chat',
                         isSelected: currentIndex == 3,
-                        onTap: () => onTap(3),
+                        onTap: () {
+                          NotificationService().clearNotifications('chat');
+                          onTap(3);
+                        },
+                        badgeCount: counts['chat'] ?? 0,
                       ),
                       _buildNavItem(
                         icon: Icons.settings,
                         label: 'Settings',
                         isSelected: currentIndex == 4,
-                        onTap: () => onTap(4),
+                        onTap: () {
+                          NotificationService().clearNotifications('settings');
+                          onTap(4);
+                        },
+                        badgeCount: counts['settings'] ?? 0,
                       ),
                     ],
                   ),
@@ -268,18 +292,15 @@ class AppDesignSystem {
             ],
           ),
 
-          // Center button - adjusted positioning
+          // Center button
           Center(
             child: Transform.translate(
-              offset: const Offset(
-                0,
-                -24,
-              ), // Slightly higher to accommodate new height
+              offset: const Offset(0, -24),
               child: GestureDetector(
                 onTap: () => onTap(2),
                 child: Container(
-                  width: 60, // Slightly larger
-                  height: 60, // Slightly larger
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: currentIndex == 2 ? AppColors.primary : Colors.white,
                     shape: BoxShape.circle,
@@ -312,39 +333,46 @@ class AppDesignSystem {
     );
   }
 
-  // Updated _buildNavItem with better spacing
   static Widget _buildNavItem({
     required IconData icon,
     required String label,
     required bool isSelected,
     required VoidCallback onTap,
+    int badgeCount = 0,
   }) {
+    Widget iconWidget = Icon(
+      icon,
+      size: 22,
+      color: isSelected ? AppColors.primary : Colors.grey.shade600,
+    );
+
+    // Add badge if count > 0
+    if (badgeCount > 0) {
+      iconWidget = BadgeHelper.buildBadge(
+        child: iconWidget,
+        count: badgeCount,
+        color: AppColors.accentPink,
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            vertical: 8,
-            horizontal: 8,
-          ), // Reduced horizontal padding
-          constraints: const BoxConstraints(
-            minWidth: 56,
-          ), // Minimum width for each item
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          constraints: const BoxConstraints(minWidth: 56),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 22, // Slightly smaller icon
-                color: isSelected ? AppColors.primary : Colors.grey.shade600,
-              ),
+              iconWidget,
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11, // Slightly smaller font
+                  fontSize: 11,
                   color: isSelected ? AppColors.primary : Colors.grey.shade600,
                 ),
               ),

@@ -7,12 +7,21 @@ import 'syllabus_screen.dart';
 import 'assessments_screen.dart';
 import 'timetable_screen.dart';
 import 'announcements_screen.dart';
+import '../services/notification_service.dart';
 
 class HomeScreenContent extends StatelessWidget {
   const HomeScreenContent({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Example: Add some notifications when content loads
+    // In a real app, you'd get these from your backend
+    Future.delayed(Duration.zero, () {
+      final notificationService = NotificationService();
+      notificationService.addNotification('assessment', count: 2);
+      notificationService.addNotification('chat');
+    });
+
     return SafeArea(
       child: CustomScrollView(
         slivers: [
