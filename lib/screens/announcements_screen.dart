@@ -61,6 +61,7 @@ class AnnouncementsScreen extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
+            color: Colors.grey[200], // Set a light, attractive background color
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
