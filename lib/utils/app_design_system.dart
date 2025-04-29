@@ -230,7 +230,12 @@ class AppDesignSystem {
   }) {
     final counts =
         notificationCounts ??
-        {'attendance': 0, 'assessment': 0, 'chat': 0, 'settings': 0};
+        {
+          'attendance': 0,
+          'assignments': 0, // Updated
+          'chat': 0,
+          'settings': 0,
+        };
 
     return Container(
       height: 80,
@@ -242,7 +247,6 @@ class AppDesignSystem {
       ),
       child: Stack(
         children: [
-          // Main navigation items
           Row(
             children: [
               // Left side items
@@ -267,22 +271,21 @@ class AppDesignSystem {
                       ),
                       _buildNavItem(
                         context: context,
-                        icon: Icons.assessment_outlined,
-                        label: 'Assessment',
+                        icon: Icons.assignment,
+                        label: 'Assignments', // Updated
                         isSelected: currentIndex == 1,
                         onTap: () {
                           NotificationService().clearNotifications(
-                            'assessment',
+                            'assignments',
                           );
                           onTap(1);
                         },
-                        badgeCount: counts['assessment'] ?? 0,
+                        badgeCount: counts['assignments'] ?? 0, // Updated
                       ),
                     ],
                   ),
                 ),
               ),
-
               // Right side items
               Expanded(
                 child: Container(
@@ -318,8 +321,7 @@ class AppDesignSystem {
               ),
             ],
           ),
-
-          // Center button
+          // Center button (Home)
           Center(
             child: Transform.translate(
               offset: const Offset(0, -24),

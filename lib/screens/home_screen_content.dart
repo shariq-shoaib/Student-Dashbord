@@ -9,6 +9,7 @@ import 'timetable_screen.dart';
 import 'announcements_screen.dart';
 import '../services/notification_service.dart';
 import '../screens/queries_screen.dart';
+import '../screens/assignments_screen.dart';
 
 class HomeScreenContent extends StatelessWidget {
   const HomeScreenContent({super.key});
@@ -37,7 +38,7 @@ class HomeScreenContent extends StatelessWidget {
 
           // Today's Timetable
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             sliver: SliverToBoxAdapter(child: _buildTimetableSection(context)),
           ),
 
@@ -49,87 +50,98 @@ class HomeScreenContent extends StatelessWidget {
             ),
           ),
 
-          // Quick Actions Grid
+          // Assignments
           SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1,
-              ),
-              delegate: SliverChildListDelegate([
-                _buildQuickActionButton(
-                  context,
-                  icon: Icons.calendar_today,
-                  label: 'Attendance',
-                  color: AppColors.primary,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AttendanceScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildQuickActionButton(
-                  context,
-                  icon: Icons.book,
-                  label: 'Syllabus',
-                  color: AppColors.secondary,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => SyllabusScreen()),
-                    );
-                  },
-                ),
-                _buildQuickActionButton(
-                  context,
-                  icon: Icons.chat,
-                  label: 'Chat Rooms',
-                  color: AppColors.accentPink,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ChatRoomsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildQuickActionButton(
-                  context,
-                  icon: Icons.assignment,
-                  label: 'Assessments',
-                  color: AppColors.accentBlue,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AssessmentsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildQuickActionButton(
-                  context,
-                  icon: Icons.help_outline,
-                  label: 'Queries',
-                  color: AppColors.accentAmber,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const QueriesScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ]),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            sliver: SliverToBoxAdapter(
+              child: _buildAssignmentsSection(context),
+            ), // New method
+          ),
+
+          // Quick Actions Grid
+          SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1,
             ),
+            delegate: SliverChildListDelegate([
+              _buildQuickActionButton(
+                context,
+                icon: Icons.calendar_today,
+                label: 'Attendance',
+                color: AppColors.primary,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AttendanceScreen(),
+                      ),
+                    ),
+              ),
+              _buildQuickActionButton(
+                context,
+                icon: Icons.book,
+                label: 'Syllabus',
+                color: AppColors.secondary,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => SyllabusScreen()),
+                    ),
+              ),
+              _buildQuickActionButton(
+                context,
+                icon: Icons.assignment,
+                label: 'Assignments',
+                color: AppColors.accentPink,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AssignmentsScreen(),
+                      ),
+                    ),
+              ),
+              _buildQuickActionButton(
+                context,
+                icon: Icons.chat,
+                label: 'Chat Rooms',
+                color: AppColors.accentBlue,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatRoomsScreen(),
+                      ),
+                    ),
+              ),
+              _buildQuickActionButton(
+                context,
+                icon: Icons.help_outline,
+                label: 'Queries',
+                color: AppColors.accentAmber,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const QueriesScreen()),
+                    ),
+              ),
+              _buildQuickActionButton(
+                context,
+                icon: Icons.assessment,
+                label: 'Assessments',
+                color: AppColors.success,
+                onTap:
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AssessmentsScreen(),
+                      ),
+                    ),
+              ),
+            ]),
           ),
         ],
       ),
@@ -534,6 +546,121 @@ class HomeScreenContent extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildAssignmentItem(
+    BuildContext context, {
+    required String subject,
+    required String title,
+    required String dueIn,
+    required Color color,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          // Navigate to assignment detail
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    subject[0],
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$subject • Due in $dueIn',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: AppColors.textSecondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssignmentsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Upcoming Assignments",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AssignmentsScreen(),
+                  ),
+                );
+              },
+              child: Text(
+                'View All',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _buildAssignmentItem(
+          context,
+          subject: 'Mathematics',
+          title: 'Linear Algebra Homework',
+          dueIn: '2 days',
+          color: AppColors.secondary,
+        ),
+        _buildAssignmentItem(
+          context,
+          subject: 'Physics',
+          title: 'Newton\'s Laws Lab Report',
+          dueIn: '5 days',
+          color: AppColors.accentBlue,
+        ),
+      ],
     );
   }
 }
