@@ -96,6 +96,7 @@ class SyllabusScreen extends StatelessWidget {
 
   Widget _buildSubjectCard(BuildContext context, Subject subject) {
     return AppDesignSystem.card(
+      context: context,
       onTap: () => _openPdfViewer(context, subject),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

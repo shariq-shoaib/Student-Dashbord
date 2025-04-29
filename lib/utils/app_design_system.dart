@@ -1,8 +1,8 @@
-// lib/utils/app_design_system.dart
 import 'package:flutter/material.dart';
-import 'theme.dart';
+import 'package:provider/provider.dart';
 import 'badge_helper.dart';
 import '../services/notification_service.dart';
+import '../providers/theme_provider.dart';
 
 class AppDesignSystem {
   // App-wide padding constants
@@ -35,8 +35,8 @@ class AppDesignSystem {
   }) {
     return AppBar(
       title: Text(title),
-      backgroundColor: AppColors.primary,
-      foregroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      foregroundColor: Theme.of(context).colorScheme.onPrimary,
       elevation: 0,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
@@ -46,10 +46,15 @@ class AppDesignSystem {
   }
 
   // Card Style
-  static Card card({required Widget child, VoidCallback? onTap}) {
+  static Card card({
+    required BuildContext context,
+    required Widget child,
+    VoidCallback? onTap,
+  }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: defaultBorderRadius),
+      color: Theme.of(context).cardTheme.color,
       child: InkWell(
         borderRadius: defaultBorderRadius,
         onTap: onTap,
@@ -59,12 +64,15 @@ class AppDesignSystem {
   }
 
   // Gradient Background
-  static BoxDecoration gradientBackground() {
+  static BoxDecoration gradientBackground(BuildContext context) {
     return BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [AppColors.primary.withOpacity(0.1), AppColors.background],
+        colors: [
+          Theme.of(context).colorScheme.primary.withOpacity(0.1),
+          Theme.of(context).colorScheme.background,
+        ],
       ),
     );
   }
@@ -83,17 +91,16 @@ class AppDesignSystem {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AppColors.primaryDark,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           if (actionText != null)
             TextButton(
               onPressed: onAction,
               child: Text(
                 actionText,
-                style: TextStyle(color: AppColors.primary),
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
         ],
@@ -103,6 +110,7 @@ class AppDesignSystem {
 
   // Stat Card
   static Widget statCard({
+    required BuildContext context,
     required IconData icon,
     required String value,
     required String label,
@@ -114,7 +122,10 @@ class AppDesignSystem {
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [color.withOpacity(0.1), Colors.white],
+            colors: [
+              color.withOpacity(0.1),
+              Theme.of(context).colorScheme.surface,
+            ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -140,7 +151,12 @@ class AppDesignSystem {
                 color: color,
               ),
             ),
-            Text(label, style: TextStyle(color: AppColors.textSecondary)),
+            Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+              ),
+            ),
           ],
         ),
       ),
@@ -149,6 +165,7 @@ class AppDesignSystem {
 
   // Message Input Field
   static Widget messageInput({
+    required BuildContext context,
     required TextEditingController controller,
     required FocusNode focusNode,
     required VoidCallback onSend,
@@ -157,7 +174,7 @@ class AppDesignSystem {
     return Container(
       margin: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -171,7 +188,7 @@ class AppDesignSystem {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.add, color: AppColors.primary),
+            icon: Icon(Icons.add, color: Theme.of(context).colorScheme.primary),
             onPressed: onAttach,
           ),
           Expanded(
@@ -182,16 +199,23 @@ class AppDesignSystem {
                 hintText: 'Type a message...',
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                hintStyle: TextStyle(color: Theme.of(context).hintColor),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
             ),
           ),
           Container(
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.white),
+              icon: Icon(
+                Icons.send,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
               onPressed: onSend,
             ),
           ),
@@ -206,7 +230,6 @@ class AppDesignSystem {
     required BuildContext context,
     Map<String, int>? notificationCounts,
   }) {
-    // Initialize notification counts if not provided
     final counts =
         notificationCounts ??
         {'attendance': 0, 'assessment': 0, 'chat': 0, 'settings': 0};
@@ -214,8 +237,10 @@ class AppDesignSystem {
     return Container(
       height: 80,
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: Theme.of(context).dividerColor, width: 1),
+        ),
       ),
       child: Stack(
         children: [
@@ -230,6 +255,7 @@ class AppDesignSystem {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _buildNavItem(
+                        context: context,
                         icon: Icons.calendar_today_outlined,
                         label: 'Attendance',
                         isSelected: currentIndex == 0,
@@ -242,6 +268,7 @@ class AppDesignSystem {
                         badgeCount: counts['attendance'] ?? 0,
                       ),
                       _buildNavItem(
+                        context: context,
                         icon: Icons.assessment_outlined,
                         label: 'Assessment',
                         isSelected: currentIndex == 1,
@@ -266,6 +293,7 @@ class AppDesignSystem {
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
                       _buildNavItem(
+                        context: context,
                         icon: Icons.chat_outlined,
                         label: 'Chat',
                         isSelected: currentIndex == 3,
@@ -276,6 +304,7 @@ class AppDesignSystem {
                         badgeCount: counts['chat'] ?? 0,
                       ),
                       _buildNavItem(
+                        context: context,
                         icon: Icons.settings,
                         label: 'Settings',
                         isSelected: currentIndex == 4,
@@ -302,7 +331,10 @@ class AppDesignSystem {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: currentIndex == 2 ? AppColors.primary : Colors.white,
+                    color:
+                        currentIndex == 2
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -314,14 +346,17 @@ class AppDesignSystem {
                     border: Border.all(
                       color:
                           currentIndex == 2
-                              ? AppColors.primary
-                              : Colors.grey.shade300,
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).dividerColor,
                       width: 1,
                     ),
                   ),
                   child: Icon(
                     currentIndex == 2 ? Icons.home : Icons.home_outlined,
-                    color: currentIndex == 2 ? Colors.white : AppColors.primary,
+                    color:
+                        currentIndex == 2
+                            ? Theme.of(context).colorScheme.onPrimary
+                            : Theme.of(context).colorScheme.primary,
                     size: 28,
                   ),
                 ),
@@ -334,6 +369,7 @@ class AppDesignSystem {
   }
 
   static Widget _buildNavItem({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required bool isSelected,
@@ -343,15 +379,17 @@ class AppDesignSystem {
     Widget iconWidget = Icon(
       icon,
       size: 22,
-      color: isSelected ? AppColors.primary : Colors.grey.shade600,
+      color:
+          isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).textTheme.bodyMedium?.color,
     );
 
-    // Add badge if count > 0
     if (badgeCount > 0) {
       iconWidget = BadgeHelper.buildBadge(
         child: iconWidget,
         count: badgeCount,
-        color: AppColors.accentPink,
+        color: Theme.of(context).colorScheme.error,
       );
     }
 
@@ -373,7 +411,10 @@ class AppDesignSystem {
                 label,
                 style: TextStyle(
                   fontSize: 11,
-                  color: isSelected ? AppColors.primary : Colors.grey.shade600,
+                  color:
+                      isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).textTheme.bodyMedium?.color,
                 ),
               ),
             ],
