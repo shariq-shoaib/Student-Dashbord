@@ -8,6 +8,7 @@ import 'assessments_screen.dart';
 import 'timetable_screen.dart';
 import 'announcements_screen.dart';
 import '../services/notification_service.dart';
+import '../screens/queries_screen.dart';
 
 class HomeScreenContent extends StatelessWidget {
   const HomeScreenContent({super.key});
@@ -109,6 +110,20 @@ class HomeScreenContent extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const AssessmentsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.help_outline,
+                  label: 'Queries',
+                  color: AppColors.accentAmber,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const QueriesScreen(),
                       ),
                     );
                   },

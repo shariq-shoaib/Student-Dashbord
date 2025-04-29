@@ -38,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'assessment': 0,
           'chat': 0,
           'settings': 0,
+          'queries': 0,
         },
         builder: (context, snapshot) {
           return AppDesignSystem.fancyBottomNavigationBar(
