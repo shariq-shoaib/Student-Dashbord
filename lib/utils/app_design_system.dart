@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'badge_helper.dart';
 import '../services/notification_service.dart';
-import '../providers/theme_provider.dart';
 
 class AppDesignSystem {
   // App-wide padding constants
