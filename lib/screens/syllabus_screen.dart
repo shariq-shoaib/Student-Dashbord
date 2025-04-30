@@ -14,6 +14,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.calculate,
       color: AppColors.accentBlue,
       pdfPath: 'assets/pdfs/math_syllabus.pdf',
+      description: '',
     ),
     Subject(
       name: 'Physics',
@@ -21,6 +22,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.science,
       color: AppColors.accentPink,
       pdfPath: 'assets/pdfs/physics_syllabus.pdf',
+      description: '',
     ),
     Subject(
       name: 'Chemistry',
@@ -28,6 +30,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.science_outlined,
       color: AppColors.secondary,
       pdfPath: 'assets/pdfs/chemistry_syllabus.pdf',
+      description: '',
     ),
     Subject(
       name: 'Biology',
@@ -35,6 +38,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.eco,
       color: AppColors.success,
       pdfPath: 'assets/pdfs/biology_syllabus.pdf',
+      description: '',
     ),
     Subject(
       name: 'Computer Science',
@@ -42,6 +46,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.computer,
       color: AppColors.primary,
       pdfPath: 'assets/pdfs/cs_syllabus.pdf',
+      description: '',
     ),
     Subject(
       name: 'English',
@@ -49,6 +54,7 @@ class SyllabusScreen extends StatelessWidget {
       icon: Icons.menu_book,
       color: AppColors.accentAmber,
       pdfPath: 'assets/pdfs/english_syllabus.pdf',
+      description: '',
     ),
   ];
 
@@ -86,7 +92,7 @@ class SyllabusScreen extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 1.2,
+            childAspectRatio: 0.8,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
           ),
@@ -105,31 +111,55 @@ class SyllabusScreen extends StatelessWidget {
       onTap: () => _openPdfViewer(context, subject),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Icon with color
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: subject.color.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(subject.icon, size: 28, color: subject.color),
+            child: Icon(subject.icon, size: 24, color: subject.color),
           ),
           const SizedBox(height: 12),
-          Text(
-            subject.name,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+
+          // Subject name (bold if exists)
+          if (subject.name.isNotEmpty)
+            Text(
+              subject.name,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subject.code,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
+
+          // Description (if exists)
+          if (subject.description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                subject.description,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+          // Code (if exists)
+          if (subject.code.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                subject.code,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -303,6 +333,7 @@ class Subject {
   final IconData icon;
   final Color color;
   final String pdfPath;
+  final String description;
 
   Subject({
     required this.name,
@@ -310,5 +341,6 @@ class Subject {
     required this.icon,
     required this.color,
     required this.pdfPath,
+    required this.description,
   });
 }
