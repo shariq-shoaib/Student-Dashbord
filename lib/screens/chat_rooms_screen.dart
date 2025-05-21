@@ -1,5 +1,6 @@
 // lib/screens/chat_rooms_screen.dart
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../screens/chat_screen.dart';
 import '../utils/app_design_system.dart';
 import '../widgets/base_screen.dart';
@@ -13,81 +14,145 @@ class ChatRoomsScreen extends StatefulWidget {
 }
 
 class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
-  final List<Map<String, dynamic>> chatRooms = [
-    {
-      'id': 'general',
-      'name': 'General Chat',
-      'subject': 'General',
-      'unreadCount': 3,
-      'lastMessage': 'Hello everyone!',
-      'isGeneral': true,
-    },
-    {
-      'id': 'math',
-      'name': 'Mathematics',
-      'subject': 'Math',
-      'unreadCount': 0,
-      'lastMessage': 'Did you solve problem 5?',
-      'isGeneral': false,
-    },
-    {
-      'id': 'science',
-      'name': 'Science',
-      'subject': 'Science',
-      'unreadCount': 5,
-      'lastMessage': 'Lab results are in!',
-      'isGeneral': false,
-    },
-    {
-      'id': 'history',
-      'name': 'History',
-      'subject': 'History',
-      'unreadCount': 0,
-      'lastMessage': 'Don\'t forget the essay',
-      'isGeneral': false,
-    },
-    {
-      'id': 'english',
-      'name': 'English',
-      'subject': 'English',
-      'unreadCount': 1,
-      'lastMessage': 'Read chapter 4 for next class',
-      'isGeneral': false,
-    },
-  ];
+  final ApiService _apiService = ApiService();
+  late Future<List<Map<String, dynamic>>> _chatRoomsFuture;
+  bool _isLoading = true;
+  String? _errorMessage;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadChatRooms();
+  }
+  Future<void> _loadChatRooms() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final rfid = '6323678'; // You might want to get this from auth or somewhere
+      final subjects = await _apiService.getSubjectsByStudentRfid(rfid);
+      print('API Response Subjects: $subjects');
+
+      if (subjects == null || subjects.isEmpty) {
+        print('No subjects received from API');
+        setState(() {
+          _chatRoomsFuture = Future.value([]);
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // Create rooms with unread counts
+      final rooms = await Future.wait(subjects.map((subject) async {
+        final unreadCount = await _apiService.getUnreadCount(rfid, subject.id.toString());
+        print('Unread count for ${subject.name}: $unreadCount');
+
+        return {
+          'id': subject.id,
+          'name': subject.name,
+          'subject': subject.code.toString(),
+          'unreadCount': unreadCount,
+          'lastMessage': 'Tap to start chatting',
+          'isGeneral': false,
+          'instructor': subject.instructor,
+        };
+      }));
+
+      print('Created rooms: $rooms');
+
+      // Add general chat with its unread count
+      final generalUnreadCount = await _apiService.getUnreadCount(rfid, 'general');
+      rooms.insert(0, {
+        'id': 'general',
+        'name': 'General Chat',
+        'subject': 'General',
+        'unreadCount': generalUnreadCount,
+        'lastMessage': 'Hello everyone!',
+        'isGeneral': true,
+        'instructor': 'All Students',
+      });
+
+      setState(() {
+        _chatRoomsFuture = Future.value(rooms);
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading chat rooms: $e');
+      setState(() {
+        _errorMessage = 'Failed to load chat rooms. Please try again.';
+        _isLoading = false;
+        _chatRoomsFuture = Future.value([]);
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return BaseScreen(
       title: 'Chat Rooms',
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppDesignSystem.sectionHeader(context, 'General Chat'),
-            Padding(
-              padding: AppDesignSystem.sectionPadding,
-              child: _buildGeneralChatCard(context),
-            ),
-            AppDesignSystem.sectionHeader(context, 'Subject Chats'),
-            Padding(
-              padding: AppDesignSystem.sectionPadding,
-              child: Column(
-                children:
-                    chatRooms
-                        .where((room) => !room['isGeneral'])
-                        .map((room) => _buildSubjectChatCard(context, room))
-                        .toList(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+          ? Center(child: Text(_errorMessage!))
+          : RefreshIndicator(
+        onRefresh: _loadChatRooms,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppDesignSystem.sectionHeader(context, 'General Chat'),
+              Padding(
+                padding: AppDesignSystem.sectionPadding,
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _chatRoomsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      final generalRoom = snapshot.data!
+                          .firstWhere((room) => room['isGeneral']);
+                      return _buildGeneralChatCard(context, generalRoom);
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
               ),
-            ),
-          ],
+              AppDesignSystem.sectionHeader(context, 'Subject Chats'),
+              Padding(
+                padding: AppDesignSystem.sectionPadding,
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _chatRoomsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      final subjectRooms = snapshot.data!
+                          .where((room) => !room['isGeneral'])
+                          .toList();
+
+                      if (subjectRooms.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text('No subjects enrolled'),
+                        );
+                      }
+
+                      return Column(
+                        children: subjectRooms
+                            .map((room) => _buildSubjectChatCard(context, room))
+                            .toList(),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildGeneralChatCard(BuildContext context) {
-    final generalRoom = chatRooms.firstWhere((room) => room['isGeneral']);
+  Widget _buildGeneralChatCard(BuildContext context, Map<String, dynamic> generalRoom) {
     return AppDesignSystem.card(
       context: context,
       onTap: () => _navigateToChatScreen(context, generalRoom),
@@ -122,9 +187,10 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
               ],
             ),
           ),
-          if (generalRoom['unreadCount'] > 0)
+          if (generalRoom['unreadCount'] > 0) ...[
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: const BoxDecoration(
                 color: AppColors.accentPink,
                 shape: BoxShape.circle,
@@ -138,15 +204,17 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
   }
 
+
   Widget _buildSubjectChatCard(
-    BuildContext context,
-    Map<String, dynamic> room,
-  ) {
+      BuildContext context,
+      Map<String, dynamic> room,
+      ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: AppDesignSystem.card(
@@ -163,7 +231,7 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
               ),
               alignment: Alignment.center,
               child: Text(
-                room['subject'][0],
+                room['subject'].toString().substring(0, 1),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -184,7 +252,7 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    room['lastMessage'],
+                    '${room['instructor']} • ${room['lastMessage']}',
                     style: Theme.of(context).textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -192,7 +260,8 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
                 ],
               ),
             ),
-            if (room['unreadCount'] > 0)
+            if (room['unreadCount'] > 0) ...[
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: const BoxDecoration(
@@ -208,29 +277,42 @@ class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
       ),
     );
   }
+  Color _getSubjectColor(String subjectCode) {
+    // Get first 3 characters (since codes are now strings like "11", "17")
+    final prefix = subjectCode.length >= 3 ? subjectCode.substring(0, 3) : subjectCode;
 
-  Color _getSubjectColor(String subject) {
     final colors = {
-      'Math': AppColors.secondary,
-      'Science': AppColors.accentBlue,
-      'History': AppColors.accentAmber,
-      'English': AppColors.primaryLight,
+      '11': AppColors.secondary,       // Computer
+      '17': AppColors.accentBlue,     // English
+      '18': AppColors.accentAmber,    // Maths
+      '19': AppColors.primaryLight,   // Physics
+      '110': AppColors.darkSurface,   // Tarjama
+      '111': AppColors.darkSecondary,  // Urdu II
+      '119': AppColors.darkPrimary,     // Pakistan Studies
     };
-    return colors[subject] ?? AppColors.primary;
+
+    return colors[prefix] ?? AppColors.primary;
   }
 
   void _navigateToChatScreen(BuildContext context, Map<String, dynamic> room) {
+    // Convert room['id'] to int safely
+    final subjectId = int.tryParse(room['id'].toString()) ?? 0;
+
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder:
-            (context, animation, secondaryAnimation) =>
-                ChatScreen(roomId: room['id'], roomName: room['name']),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            ChatScreen(
+              currentUserRfid: '6323678',
+              subjectId: subjectId,  // Now properly converted to int
+              roomName: room['name'].toString(),
+            ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return SlideTransition(
             position: Tween<Offset>(

@@ -1,34 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../utils/theme.dart';
 import '../widgets/attendance_progress_bar.dart';
 import '../screens/attendance_records_screen.dart';
 import '../models/attendance_model.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
+  final String rfid;
+
+  const AttendanceScreen({super.key, required this.rfid});
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
 class _AttendanceScreenState extends State<AttendanceScreen> {
-  List<Map<String, dynamic>> subjects = [
-    {'name': 'Mathematics', 'percentage': 92, 'icon': Icons.calculate},
-    {'name': 'Physics', 'percentage': 78, 'icon': Icons.science},
-    {'name': 'Chemistry', 'percentage': 58, 'icon': Icons.emoji_objects},
-    {'name': 'English', 'percentage': 88, 'icon': Icons.menu_book},
-    {'name': 'Computer Science', 'percentage': 45, 'icon': Icons.computer},
-  ];
+  Map<String, dynamic> attendanceData = {};
+  bool isLoading = true;
+  bool hasError = false;
+  String errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAttendanceData();
+  }
+
+  Future<void> _fetchAttendanceData() async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://193.203.162.232:5050/attendance/student/attendance_summary'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'rfid': widget.rfid}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          attendanceData = data;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          hasError = true;
+          errorMessage = 'Failed to load attendance data: ${response.statusCode}';
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        hasError = true;
+        errorMessage = 'Error: $e';
+        isLoading = false;
+      });
+    }
+  }
 
   Future<void> _refreshData() async {
-    await Future.delayed(const Duration(seconds: 1));
-    // In real app, fetch latest attendance here
-    setState(() {});
+    setState(() {
+      isLoading = true;
+      hasError = false;
+    });
+    await _fetchAttendanceData();
   }
 
   @override
   Widget build(BuildContext context) {
-    final overallAttendance = _calculateOverallAttendance();
+    if (isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Attendance'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (hasError) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Attendance'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(errorMessage, style: const TextStyle(color: Colors.red)),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _refreshData,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Extract all data from attendanceData with proper null checks
+    final subjects = List<Map<String, dynamic>>.from(attendanceData['subjects'] ?? []);
+    final overallAttendance = attendanceData['overall_attendance'] ?? 0;
+    final totalPresent = attendanceData['total_present'] ?? 0;
+    final totalAbsent = attendanceData['total_absent'] ?? 0;
+    final totalClasses = attendanceData['total_classes'] ?? 0;
+    final monthlySummary = List<Map<String, dynamic>>.from(attendanceData['monthly_summary'] ?? []);
 
     return Scaffold(
       appBar: AppBar(
@@ -52,15 +131,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           onRefresh: _refreshData,
           child: CustomScrollView(
             slivers: [
-              // Summary Card
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: _buildSummaryCard(context, overallAttendance),
+                  child: _buildSummaryCard(
+                    context,
+                    overallAttendance,
+                    totalPresent,
+                    totalAbsent,
+                    totalClasses,
+                    monthlySummary,
+                    subjects,
+                  ),
                 ),
               ),
-
-              // Subjects Header
               SliverPadding(
                 padding: const EdgeInsets.only(left: 24, top: 16, right: 24),
                 sliver: SliverToBoxAdapter(
@@ -73,14 +157,18 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   ),
                 ),
               ),
-
-              // Subjects List
               SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                sliver: SliverList(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                sliver: subjects.isEmpty
+                    ? SliverToBoxAdapter(
+                  child: const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No attendance data available'),
+                    ),
+                  ),
+                )
+                    : SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final subject = subjects[index];
                     return _buildSubjectCard(context, subject);
@@ -94,7 +182,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Widget _buildSummaryCard(BuildContext context, int overallPercentage) {
+  Widget _buildSummaryCard(
+      BuildContext context,
+      int overallPercentage,
+      int totalPresent,
+      int totalAbsent,
+      int totalClasses,
+      List<Map<String, dynamic>> monthlySummary,
+      List<Map<String, dynamic>> subjects,
+      ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -147,6 +243,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             ),
             const SizedBox(height: 16),
             AttendanceProgressBar(percentage: overallPercentage),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem('Present', '$totalPresent', Colors.green),
+                _buildStatItem('Absent', '$totalAbsent', Colors.red),
+                _buildStatItem('Total', '$totalClasses', AppColors.primaryDark),
+              ],
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -162,46 +267,31 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder:
-                          (context) => AttendanceRecordsScreen(
-                            summary: AttendanceSummary(
-                              overallPercentage: overallPercentage,
-                              totalPresent: 120, // Replace with actual data
-                              totalAbsent: 15, // Replace with actual data
-                              totalClasses: 135, // Replace with actual data
-                              monthlyData: [
-                                MonthlyAttendance(
-                                  month: 'January',
-                                  present: 25,
-                                  absent: 2,
-                                ),
-                                MonthlyAttendance(
-                                  month: 'February',
-                                  present: 22,
-                                  absent: 3,
-                                ),
-                                // Add more months
-                              ],
-                              subjects:
-                                  subjects
-                                      .map(
-                                        (s) => SubjectAttendance(
-                                          name: s['name'],
-                                          percentage: s['percentage'],
-                                          present:
-                                              20, // Replace with actual data
-                                          absent: 5, // Replace with actual data
-                                          totalClasses:
-                                              25, // Replace with actual data
-                                          recentAbsences: [
-                                            DateTime(2023, 5, 10),
-                                            DateTime(2023, 5, 3),
-                                          ], // Replace with actual data
-                                        ),
-                                      )
-                                      .toList(),
-                            ),
-                          ),
+                      builder: (context) => AttendanceRecordsScreen(
+                        summary: AttendanceSummary(
+                          overallPercentage: overallPercentage,
+                          totalPresent: totalPresent,
+                          totalAbsent: totalAbsent,
+                          totalClasses: totalClasses,
+                          monthlyData: monthlySummary.map((month) {
+                            return MonthlyAttendance(
+                              month: month['month']?.toString() ?? 'Unknown',
+                              present: month['present'] ?? 0,
+                              absent: month['absent'] ?? 0,
+                            );
+                          }).toList(),
+                          subjects: subjects.map((subject) {
+                            return SubjectAttendance(
+                              name: subject['name']?.toString() ?? 'Unknown',
+                              percentage: subject['percentage'] ?? 0,
+                              present: subject['present'] ?? 0,
+                              absent: subject['absent'] ?? 0,
+                              totalClasses: subject['total_classes'] ?? 0,
+                              recentAbsences: _parseAbsenceDates(subject['recent_absences']),
+                            );
+                          }).toList(),
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -220,6 +310,29 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSubjectCard(BuildContext context, Map<String, dynamic> subject) {
     final color = _getSubjectColor(subject['name']);
 
@@ -230,7 +343,34 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(15),
         onTap: () {
-          // Show subject details
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AttendanceRecordsScreen(
+                summary: AttendanceSummary(
+                  overallPercentage: attendanceData['overall_attendance'] ?? 0,
+                  totalPresent: attendanceData['total_present'] ?? 0,
+                  totalAbsent: attendanceData['total_absent'] ?? 0,
+                  totalClasses: attendanceData['total_classes'] ?? 0,
+                  monthlyData: List<Map<String, dynamic>>.from(attendanceData['monthly_summary'] ?? [])
+                      .map((month) => MonthlyAttendance(
+                    month: month['month']?.toString() ?? 'Unknown',
+                    present: month['present'] ?? 0,
+                    absent: month['absent'] ?? 0,
+                  ))
+                      .toList(),
+                  subjects: [SubjectAttendance(
+                    name: subject['name']?.toString() ?? 'Unknown',
+                    percentage: subject['percentage'] ?? 0,
+                    present: subject['present'] ?? 0,
+                    absent: subject['absent'] ?? 0,
+                    totalClasses: subject['total_classes'] ?? 0,
+                    recentAbsences: _parseAbsenceDates(subject['recent_absences']),
+                  )],
+                ),
+              ),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -244,7 +384,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
-                child: Icon(subject['icon'], color: color, size: 24),
+                child: Icon(_getSubjectIcon(subject['name']), color: color, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -252,19 +392,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      subject['name'],
+                      subject['name']?.toString() ?? 'Unknown',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    AttendanceProgressBar(percentage: subject['percentage']),
+                    AttendanceProgressBar(percentage: subject['percentage'] ?? 0),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
               Text(
-                '${subject['percentage']}%',
+                '${subject['percentage'] ?? 0}%',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -278,9 +418,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  Color _getSubjectColor(String subjectName) {
+  IconData _getSubjectIcon(String? subjectName) {
+    final icons = {
+      'Maths': Icons.calculate,
+      'Physics': Icons.science,
+      'Chemistry': Icons.emoji_objects,
+      'English': Icons.menu_book,
+      'Computer Science': Icons.computer,
+    };
+    return icons[subjectName] ?? Icons.subject;
+  }
+
+  Color _getSubjectColor(String? subjectName) {
     final colors = {
-      'Mathematics': AppColors.secondary,
+      'Maths': AppColors.secondary,
       'Physics': AppColors.accentBlue,
       'Chemistry': AppColors.accentPink,
       'English': AppColors.primary,
@@ -289,11 +440,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return colors[subjectName] ?? AppColors.primaryDark;
   }
 
-  int _calculateOverallAttendance() {
-    if (subjects.isEmpty) return 0;
-    final total = subjects
-        .map((s) => s['percentage'] as int)
-        .reduce((a, b) => a + b);
-    return (total / subjects.length).round();
+  List<DateTime> _parseAbsenceDates(List<dynamic>? dates) {
+    if (dates == null) return [];
+    return dates.map((dateStr) {
+      try {
+        return DateTime.parse(dateStr.toString());
+      } catch (e) {
+        return DateTime.now(); // Return current date as fallback
+      }
+    }).toList();
   }
 }

@@ -21,6 +21,7 @@ class MyApp extends StatelessWidget {
       title: 'LGC App',
       theme: Provider.of<ThemeProvider>(context).currentTheme,
       home: const HomeScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

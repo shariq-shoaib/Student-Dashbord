@@ -1,5 +1,7 @@
 // lib/screens/home_screen_content.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../utils/theme.dart';
 import 'attendance_screen.dart';
 import 'chat_rooms_screen.dart';
@@ -11,139 +13,198 @@ import '../services/notification_service.dart';
 import '../screens/queries_screen.dart';
 import '../screens/assignments_screen.dart';
 
-class HomeScreenContent extends StatelessWidget {
-  const HomeScreenContent({super.key});
+class HomeScreenContent extends StatefulWidget {
+  final String rfid;
+
+
+  const HomeScreenContent({super.key, required this.rfid});
 
   @override
-  Widget build(BuildContext context) {
-    // Example: Add some notifications when content loads
-    // In a real app, you'd get these from your backend
-    Future.delayed(Duration.zero, () {
+  State<HomeScreenContent> createState() => _HomeScreenContentState();
+}
+
+class _HomeScreenContentState extends State<HomeScreenContent> {
+  Map<String, dynamic>? studentData;
+  bool isLoading = true;
+  bool hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStudentData();
+  }
+
+  Future<void> _fetchStudentData() async {
+    try {
+      final data = await fetchStudentData(widget.rfid);
+      setState(() {
+        studentData = data;
+        isLoading = false;
+      });
+
+      // Add notifications after data loads
       final notificationService = NotificationService();
       notificationService.addNotification('assessment', count: 2);
       notificationService.addNotification('chat');
-    });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        hasError = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching student data: $e')),
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchStudentData(String rfid) async {
+    final response = await http.post(
+      Uri.parse('http://193.203.162.232:5050/student/student_dashboard'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'rfid': rfid}),
+    );
+
+
+    if (response.statusCode == 200) {
+      print("Profile image URL: ${studentData?['profile_image']}");
+
+      final data = jsonDecode(response.body);
+      return data['data'];
+    } else {
+      throw Exception('Failed to load student data: ${response.body}');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (hasError || studentData == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text('Failed to load student data'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchStudentData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          // Your existing Header Section
-          SliverToBoxAdapter(child: _buildHeader(context)),
-
-          // Your Stats Section
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            sliver: SliverToBoxAdapter(child: _buildStatsRow(context)),
-          ),
-
-          // Today's Timetable
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            sliver: SliverToBoxAdapter(child: _buildTimetableSection(context)),
-          ),
-
-          // Announcements
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            sliver: SliverToBoxAdapter(
-              child: _buildAnnouncementsSection(context),
+      child: RefreshIndicator(
+        onRefresh: _fetchStudentData,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader(context)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(child: _buildStatsRow(context)),
             ),
-          ),
-
-          // Assignments
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            sliver: SliverToBoxAdapter(
-              child: _buildAssignmentsSection(context),
-            ), // New method
-          ),
-
-          // Quick Actions Grid
-          SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(child: _buildTimetableSection(context)),
             ),
-            delegate: SliverChildListDelegate([
-              _buildQuickActionButton(
-                context,
-                icon: Icons.calendar_today,
-                label: 'Attendance',
-                color: AppColors.primary,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AttendanceScreen(),
-                      ),
-                    ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(
+                child: _buildAnnouncementsSection(context),
               ),
-              _buildQuickActionButton(
-                context,
-                icon: Icons.book,
-                label: 'Syllabus',
-                color: AppColors.secondary,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => SyllabusScreen()),
-                    ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(
+                child: _buildAssignmentsSection(context),
               ),
-              _buildQuickActionButton(
-                context,
-                icon: Icons.assignment,
-                label: 'Assignments',
-                color: AppColors.accentPink,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AssignmentsScreen(),
-                      ),
-                    ),
+            ),
+            SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1,
               ),
-              _buildQuickActionButton(
-                context,
-                icon: Icons.chat,
-                label: 'Chat Rooms',
-                color: AppColors.accentBlue,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ChatRoomsScreen(),
-                      ),
+              delegate: SliverChildListDelegate([
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.calendar_today,
+                  label: 'Attendance',
+                  color: AppColors.primary,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AttendanceScreen(rfid: '6323678'),
                     ),
-              ),
-              _buildQuickActionButton(
-                context,
-                icon: Icons.help_outline,
-                label: 'Queries',
-                color: AppColors.accentAmber,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const QueriesScreen()),
+                  ),
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.book,
+                  label: 'Syllabus',
+                  color: AppColors.secondary,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => SyllabusScreen()),
+                  ),
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.assignment,
+                  label: 'Assignments',
+                  color: AppColors.accentPink,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AssignmentsScreen(studentRfid: '6323678'),
                     ),
-              ),
-              _buildQuickActionButton(
-                context,
-                icon: Icons.assessment,
-                label: 'Assessments',
-                color: AppColors.success,
-                onTap:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AssessmentsScreen(),
-                      ),
+                  ),
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.chat,
+                  label: 'Chat Rooms',
+                  color: AppColors.accentBlue,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatRoomsScreen(),
                     ),
-              ),
-            ]),
-          ),
-        ],
+                  ),
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.help_outline,
+                  label: 'Queries',
+                  color: AppColors.accentAmber,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const QueriesScreen(studentRfid: '6323678',)),
+                  ),
+                ),
+                _buildQuickActionButton(
+                  context,
+                  icon: Icons.assessment,
+                  label: 'Assessments',
+                  color: AppColors.success,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AssessmentsScreen(rfid: '6323678'),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -176,14 +237,14 @@ class HomeScreenContent extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Good Morning,',
+                'Good ${_getGreeting()}',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withOpacity(0.9),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'Sarah Khan',
+                studentData?['name'] ?? 'Student',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -200,7 +261,7 @@ class HomeScreenContent extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Grade 12 - Section A',
+                  'Grade ${studentData?['grade']} - Section ${studentData?['section']}',
                   style: Theme.of(
                     context,
                   ).textTheme.bodySmall?.copyWith(color: Colors.white),
@@ -220,16 +281,25 @@ class HomeScreenContent extends StatelessWidget {
                 ),
               ],
             ),
-            child: const CircleAvatar(
+
+            child: CircleAvatar(
               radius: 32,
-              backgroundImage: NetworkImage(
-                'https://randomuser.me/api/portraits/women/43.jpg',
-              ),
+
+              backgroundImage: studentData?['profile_image'] != null
+                  ? NetworkImage(studentData!['profile_image'])
+                  : const AssetImage('assets/default_profile.png') as ImageProvider,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
   }
 
   Widget _buildStatsRow(BuildContext context) {
@@ -239,7 +309,7 @@ class HomeScreenContent extends StatelessWidget {
           child: _buildStatCard(
             context,
             icon: Icons.calendar_today,
-            value: '85%',
+            value: '${studentData?['attendance_percentage'] ?? '0'}%',
             label: 'Attendance',
             color: AppColors.primary,
           ),
@@ -249,7 +319,7 @@ class HomeScreenContent extends StatelessWidget {
           child: _buildStatCard(
             context,
             icon: Icons.assignment,
-            value: '92%',
+            value: '${studentData?['average_score'] ?? '0'}%',
             label: 'Avg. Score',
             color: AppColors.secondary,
           ),
@@ -259,12 +329,12 @@ class HomeScreenContent extends StatelessWidget {
   }
 
   Widget _buildStatCard(
-    BuildContext context, {
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required String value,
+        required String label,
+        required Color color,
+      }) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -309,6 +379,8 @@ class HomeScreenContent extends StatelessWidget {
   }
 
   Widget _buildTimetableSection(BuildContext context) {
+    final timetable = studentData?['timetable'] ?? [];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -329,7 +401,7 @@ class HomeScreenContent extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const TimetableScreen(),
+                      builder: (context) => TimetableScreen(),
                     ),
                   );
                 },
@@ -350,29 +422,21 @@ class HomeScreenContent extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildClassItem(
-                  context,
-                  time: '08:00 - 09:00',
-                  subject: 'Mathematics',
-                  room: 'B-12',
-                  color: AppColors.primary,
-                ),
-                const Divider(height: 16, thickness: 1),
-                _buildClassItem(
-                  context,
-                  time: '09:00 - 10:00',
-                  subject: 'Physics',
-                  room: 'Lab-2',
-                  color: AppColors.secondary,
-                ),
-                const Divider(height: 16, thickness: 1),
-                _buildClassItem(
-                  context,
-                  time: '10:30 - 11:30',
-                  subject: 'Chemistry',
-                  room: 'B-14',
-                  color: AppColors.accentBlue,
-                ),
+                for (var i = 0; i < timetable.length; i++) ...[
+                  if (i > 0) const Divider(height: 16, thickness: 1),
+                  _buildClassItem(
+                    context,
+                    time: timetable[i]['time'],
+                    subject: timetable[i]['subject'],
+                    room: timetable[i]['room'],
+                    color: _getSubjectColor(timetable[i]['subject']),
+                  ),
+                ],
+                if (timetable.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('No classes today'),
+                  ),
               ],
             ),
           ),
@@ -381,13 +445,25 @@ class HomeScreenContent extends StatelessWidget {
     );
   }
 
+  Color _getSubjectColor(String subject) {
+    final colors = {
+      'Mathematics': AppColors.primary,
+      'Physics': AppColors.secondary,
+      'Chemistry': AppColors.accentBlue,
+      'Biology': AppColors.success,
+      'English': AppColors.accentPink,
+      'History': AppColors.accentAmber,
+    };
+    return colors[subject] ?? AppColors.primary;
+  }
+
   Widget _buildClassItem(
-    BuildContext context, {
-    required String time,
-    required String subject,
-    required String room,
-    required Color color,
-  }) {
+      BuildContext context, {
+        required String time,
+        required String subject,
+        required String room,
+        required Color color,
+      }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -434,62 +510,76 @@ class HomeScreenContent extends StatelessWidget {
   }
 
   Widget _buildAnnouncementsSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Latest Announcements",
-                style: Theme.of(context).textTheme.headlineSmall,
+    final announcements = studentData?['announcements'] ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Latest Announcements",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.bold,
               ),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AnnouncementsScreen(),
-                    ),
-                  );
-                },
-                child: Text(
-                  'View All',
-                  style: TextStyle(color: AppColors.primary),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildAnnouncementItem(
-                    title: 'Sports Day Postponed',
-                    message: 'The sports day event has been postponed...',
-                    time: 'Today',
-                    color: AppColors.secondary.withOpacity(0.2),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AnnouncementsScreen(),
                   ),
+                );
+              },
+              child: Text(
+                'View All',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                for (var i = 0; i < (announcements.length > 2 ? 2 : announcements.length); i++) ...[
+                  if (i > 0) const SizedBox(height: 16),
                   _buildAnnouncementItem(
-                    title: 'Science Fair Winners',
-                    message: 'Congratulations to all participants...',
-                    time: 'Yesterday',
-                    color: AppColors.primary.withOpacity(0.2),
+                    title: announcements[i]['title'],
+                    message: announcements[i]['message'],
+                    time: announcements[i]['date'],
+                    color: _getRandomColor(i),
                   ),
                 ],
-              ),
+                if (announcements.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('No announcements available'),
+                  ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  Color _getRandomColor(int index) {
+    final colors = [
+      AppColors.secondary.withOpacity(0.2),
+      AppColors.primary.withOpacity(0.2),
+      AppColors.accentBlue.withOpacity(0.2),
+      AppColors.accentPink.withOpacity(0.2),
+    ];
+    return colors[index % colors.length];
   }
 
   Widget _buildAnnouncementItem({
@@ -498,30 +588,27 @@ class HomeScreenContent extends StatelessWidget {
     required String time,
     required Color color,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          child: Icon(Icons.notifications, color: AppColors.primary),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(message, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: Text(time, style: TextStyle(color: AppColors.textSecondary)),
-        contentPadding: EdgeInsets.zero,
+    return ListTile(
+      leading: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child: Icon(Icons.notifications, color: AppColors.primary),
       ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(message, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: Text(time, style: TextStyle(color: AppColors.textSecondary)),
+      contentPadding: EdgeInsets.zero,
     );
   }
 
   Widget _buildQuickActionButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+      BuildContext context, {
+        required IconData icon,
+        required String label,
+        required Color color,
+        required VoidCallback onTap,
+      }) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -549,13 +636,69 @@ class HomeScreenContent extends StatelessWidget {
     );
   }
 
+  Widget _buildAssignmentsSection(BuildContext context) {
+    final assignments = studentData?['assignments'] ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "Upcoming Assignments",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AssignmentsScreen(studentRfid: '6323678'),
+                  ),
+                );
+              },
+              child: Text(
+                'View All',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (assignments.isNotEmpty)
+          for (var i = 0; i < (assignments.length > 2 ? 2 : assignments.length); i++)
+            _buildAssignmentItem(
+              context,
+              subject: assignments[i]['subject'],
+              title: assignments[i]['title'],
+              dueIn: assignments[i]['due'],
+              color: _getSubjectColor(assignments[i]['subject']),
+            ),
+        if (assignments.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'No upcoming assignments',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildAssignmentItem(
-    BuildContext context, {
-    required String subject,
-    required String title,
-    required String dueIn,
-    required Color color,
-  }) {
+      BuildContext context, {
+        required String subject,
+        required String title,
+        required String dueIn,
+        required Color color,
+      }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -612,55 +755,6 @@ class HomeScreenContent extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildAssignmentsSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "Upcoming Assignments",
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: AppColors.primaryDark,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AssignmentsScreen(),
-                  ),
-                );
-              },
-              child: Text(
-                'View All',
-                style: TextStyle(color: AppColors.primary),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        _buildAssignmentItem(
-          context,
-          subject: 'Mathematics',
-          title: 'Linear Algebra Homework',
-          dueIn: '2 days',
-          color: AppColors.secondary,
-        ),
-        _buildAssignmentItem(
-          context,
-          subject: 'Physics',
-          title: 'Newton\'s Laws Lab Report',
-          dueIn: '5 days',
-          color: AppColors.accentBlue,
-        ),
-      ],
     );
   }
 }

@@ -1,12 +1,13 @@
-// lib/models/chat_message_model.dart
 class ChatMessage {
-  final String id;
-  final String roomId;
+  final int id;
+  final int roomId;
   final String senderId;
   final String senderName;
   final String content;
   final DateTime timestamp;
-  final bool isRead;
+  bool isRead;
+  List<String> readers;
+  DateTime? readAt;  // Add readAt field to track when the message is read
 
   ChatMessage({
     required this.id,
@@ -15,30 +16,39 @@ class ChatMessage {
     required this.senderName,
     required this.content,
     required this.timestamp,
-    this.isRead = false,
+    required this.isRead,
+    this.readers = const [],
+    this.readAt,  // Optional field, can be null if not yet read
   });
 
-  factory ChatMessage.fromMap(Map<String, dynamic> map) {
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
-      id: map['id'],
-      roomId: map['roomId'],
-      senderId: map['senderId'],
-      senderName: map['senderName'],
-      content: map['content'],
-      timestamp: DateTime.parse(map['timestamp']),
-      isRead: map['isRead'] ?? false,
+      id: json['message_id'] ?? 0,
+      roomId: json['room_id'] ?? 0,
+      senderId: json['sender_rfid']?.toString() ?? 'unknown',
+      senderName: json['sender_name']?.toString() ?? 'Unknown',
+      content: json['message_text']?.toString() ?? '',
+      timestamp: DateTime.tryParse(json['sent_at']?.toString() ?? '') ?? DateTime.now(),
+      isRead: json['is_read'] ?? false,
+      // Handle readAt field in JSON, if available
+      readAt: json['read_at'] != null ? DateTime.tryParse(json['read_at']?.toString() ?? '') : null,
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'roomId': roomId,
-      'senderId': senderId,
-      'senderName': senderName,
-      'content': content,
-      'timestamp': timestamp.toIso8601String(),
-      'isRead': isRead,
-    };
+  Map<String, dynamic> toJson() => {
+    'message_id': id,
+    'room_id': roomId,
+    'sender_rfid': senderId,
+    'sender_name': senderName,
+    'message_text': content,
+    'sent_at': timestamp.toIso8601String(),
+    'is_read': isRead,
+    'read_at': readAt?.toIso8601String(),  // Include readAt in JSON if available
+  };
+
+  // Optionally, you can create a method to mark the message as read and set the readAt time
+  void markAsRead() {
+    isRead = true;
+    readAt = DateTime.now();  // Set the current time when the message is marked as read
   }
 }

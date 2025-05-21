@@ -47,8 +47,8 @@ class MockChatService implements ChatService {
   final Map<String, List<ChatMessage>> _mockMessages = {
     'general': [
       ChatMessage(
-        id: '1',
-        roomId: 'general',
+        id: 1,
+        roomId: 1,
         senderId: 'user1',
         senderName: 'John Doe',
         content: 'Hello everyone! How are you doing?',
@@ -56,8 +56,8 @@ class MockChatService implements ChatService {
         isRead: true,
       ),
       ChatMessage(
-        id: '2',
-        roomId: 'general',
+        id: 1,
+        roomId: 1,
         senderId: 'user2',
         senderName: 'Jane Smith',
         content: 'I\'m doing great! Working on the math assignment.',
@@ -67,8 +67,8 @@ class MockChatService implements ChatService {
     ],
     'math': [
       ChatMessage(
-        id: '3',
-        roomId: 'math',
+        id: 1,
+        roomId: 1,
         senderId: 'user3',
         senderName: 'Mike Johnson',
         content: 'Did anyone solve problem 5 yet?',
@@ -76,8 +76,8 @@ class MockChatService implements ChatService {
         isRead: true,
       ),
       ChatMessage(
-        id: '4',
-        roomId: 'math',
+        id: 1,
+        roomId: 1,
         senderId: 'user4',
         senderName: 'Sarah Williams',
         content: 'I got stuck on problem 5 too.',
@@ -87,8 +87,8 @@ class MockChatService implements ChatService {
     ],
     'science': [
       ChatMessage(
-        id: '5',
-        roomId: 'science',
+        id: 1,
+        roomId: 1,
         senderId: 'user5',
         senderName: 'Alex Brown',
         content: 'Remember the lab report is due tomorrow!',
@@ -139,8 +139,8 @@ class MockChatService implements ChatService {
     // Return some older mock messages
     return [
       ChatMessage(
-        id: 'old1',
-        roomId: roomId,
+        id: 1,
+        roomId: 1,
         senderId: 'user6',
         senderName: 'Teacher',
         content: 'This is an older message from your teacher',
@@ -148,8 +148,8 @@ class MockChatService implements ChatService {
         isRead: true,
       ),
       ChatMessage(
-        id: 'old2',
-        roomId: roomId,
+        id: 1,
+        roomId: 1,
         senderId: 'user7',
         senderName: 'Classmate',
         content: 'We had this discussion last week',
@@ -164,8 +164,8 @@ class MockChatService implements ChatService {
     await Future.delayed(const Duration(milliseconds: 200));
 
     final newMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      roomId: roomId,
+      id: DateTime.now().millisecondsSinceEpoch,
+      roomId: 1,
       senderId: currentUserId,
       senderName: 'You',
       content: content,

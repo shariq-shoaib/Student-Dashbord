@@ -1,13 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/chat_message_model.dart';
+import '../services/api_service.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../utils/theme.dart';
 
 class ChatScreen extends StatefulWidget {
-  final String roomId;
+  final int subjectId;
   final String roomName;
+  final String currentUserRfid; // Add current user RFID
 
-  const ChatScreen({super.key, required this.roomId, required this.roomName});
+  const ChatScreen({
+    super.key,
+    required this.subjectId,
+    required this.roomName,
+    required this.currentUserRfid,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -18,97 +27,128 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final ApiService _apiService = ApiService();
+  int? _roomId;
+  bool _isLoading = true;
+  String? _errorMessage;
+  Timer? _readReceiptTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initializeChatRoom();
+    _startReadReceiptTimer();
   }
 
-  Future<void> _loadMessages() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() {
-      _messages.addAll([
-        ChatMessage(
-          id: '1',
-          roomId: widget.roomId,
-          senderId: 'user1',
-          senderName: 'John Doe',
-          content: 'Hello everyone! How are you doing?',
-          timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-          isRead: true,
-        ),
-        ChatMessage(
-          id: '2',
-          roomId: widget.roomId,
-          senderId: 'user2',
-          senderName: 'Jane Smith',
-          content: "I'm doing great! Working on the math assignment.",
-          timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-          isRead: true,
-        ),
-        ChatMessage(
-          id: '3',
-          roomId: widget.roomId,
-          senderId: 'user3',
-          senderName: 'Mike Johnson',
-          content: "Has anyone finished problem 5? I'm stuck.",
-          timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-          isRead: true,
-        ),
-        ChatMessage(
-          id: '4',
-          roomId: widget.roomId,
-          senderId: 'user1',
-          senderName: 'John Doe',
-          content: "I just finished it. It was tricky!",
-          timestamp: DateTime.now(),
-          isRead: false,
-        ),
-      ]);
-    });
-    _scrollToBottom();
+  @override
+  void dispose() {
+    _readReceiptTimer?.cancel();
+    _messageController.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    super.dispose();
   }
 
-  Future<void> _refreshMessages() async {
-    await Future.delayed(const Duration(seconds: 1));
-    if (_messages.isNotEmpty) {
+  Future<void> _initializeChatRoom() async {
+    try {
+      _roomId = await _apiService.getOrCreateChatRoom(widget.subjectId);
+      await _loadMessages();
+      setState(() => _isLoading = false);
+    } catch (e) {
       setState(() {
-        _messages.insert(
-          0,
-          ChatMessage(
-            id: 'new',
-            roomId: widget.roomId,
-            senderId: 'user4',
-            senderName: 'Sarah Williams',
-            content: 'Just joined the chat!',
-            timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-            isRead: true,
-          ),
-        );
+        _errorMessage = 'Failed to load chat: ${e.toString()}';
+        _isLoading = false;
       });
     }
   }
 
-  void _sendMessage() {
+  Future<void> _loadMessages() async {
+    if (_roomId == null) return;
+
+    try {
+      final messages = await _apiService.getMessagesByRoomId(_roomId!);
+      setState(() {
+        _messages.clear();
+        _messages.addAll(messages);
+      });
+      _scrollToBottom();
+      _markMessagesAsRead(); // Mark messages as read when loaded
+    } catch (e) {
+      setState(() => _errorMessage = 'Failed to load messages');
+    }
+  }
+
+  Future<void> _refreshMessages() async {
+    await _loadMessages();
+  }
+
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _roomId == null) return;
 
-    final newMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      roomId: widget.roomId,
-      senderId: 'currentUser',
-      senderName: 'You',
-      content: text,
-      timestamp: DateTime.now(),
-      isRead: true,
-    );
+    try {
+      final newMessage = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch, // convert int to String
+        roomId: _roomId ??0,                          // convert int to String
+        senderId: widget.currentUserRfid,                    // already String
+        senderName: 'You',
+        content: text,
+        timestamp: DateTime.now(),
+        isRead: true,
+      );
 
-    setState(() {
-      _messages.add(newMessage);
-      _messageController.clear();
+
+      setState(() {
+        _messages.add(newMessage);
+        _messageController.clear();
+      });
+      _scrollToBottom();
+
+      await _apiService.sendMessage(
+        roomId: _roomId!,
+        senderRfid: widget.currentUserRfid,
+        messageText: text,
+      );
+
+      await _loadMessages();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send message: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _startReadReceiptTimer() {
+    _readReceiptTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _markMessagesAsRead();
     });
-    _scrollToBottom();
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    if (_roomId == null) return;
+
+    try {
+      // Get unread messages from others
+      final unreadMessages = _messages.where((m) =>
+      m.senderId != widget.currentUserRfid && !m.isRead
+      ).toList();
+
+      if (unreadMessages.isNotEmpty) {
+        await _apiService.markMessagesAsRead(
+          messageIds: unreadMessages.map((m) => m.id).toList(),
+          readerRfid: widget.currentUserRfid,
+        );
+
+        // Update local state
+        setState(() {
+          for (final msg in unreadMessages) {
+            msg.isRead = true;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error marking messages as read: $e');
+    }
   }
 
   void _scrollToBottom() {
@@ -137,9 +177,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              // Handle more options
-            },
+            onPressed: () => _showChatOptions(context),
           ),
         ],
       ),
@@ -148,35 +186,144 @@ class _ChatScreenState extends State<ChatScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [AppColors.primary.withOpacity(0.05), AppColors.background],
+            colors: [
+              AppColors.primary.withOpacity(0.05),
+              AppColors.background
+            ],
           ),
         ),
         child: Column(
           children: [
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refreshMessages,
-                backgroundColor: AppColors.primary.withOpacity(0.2),
-                color: Colors.white,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(top: 8, bottom: 8),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    final message = _messages[index];
-                    return ChatMessageBubble(
-                      message: message,
-                      isMe: message.senderId == 'currentUser',
-                    );
-                  },
+            if (_isLoading)
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (_errorMessage != null)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _refreshMessages,
+                  backgroundColor: AppColors.primary.withOpacity(0.2),
+                  color: Colors.white,
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.only(top: 8, bottom: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final message = _messages[index];
+                      return ChatMessageBubble(
+                        message: message,
+                        isMe: message.senderId == widget.currentUserRfid,
+                        showReadReceipt: message.senderId == widget.currentUserRfid,
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
             _buildMessageInput(),
           ],
         ),
       ),
     );
+  }
+
+
+  void _showChatOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.mark_as_unread),
+            title: const Text('Mark all as read'),
+            onTap: () {
+              Navigator.pop(context);
+              _markAllMessagesAsRead();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete),
+            title: const Text('Clear chat history'),
+            onTap: () => _confirmClearChat(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markAllMessagesAsRead() async {
+    try {
+      final unreadIds = _messages
+          .where((m) => m.senderId != widget.currentUserRfid && !m.isRead)
+          .map((m) => m.id)
+          .toList();
+
+      if (unreadIds.isNotEmpty) {
+        await _apiService.markMessagesAsRead(
+          messageIds: unreadIds,
+          readerRfid: widget.currentUserRfid,
+        );
+
+        setState(() {
+          for (final msg in _messages) {
+            if (unreadIds.contains(msg.id)) {
+              msg.isRead = true;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to mark messages as read: $e')),
+      );
+    }
+  }
+
+  void _confirmClearChat(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear chat history?'),
+        content: const Text('This will remove all messages from this chat.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clearChatHistory();
+            },
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearChatHistory() async {
+    if (_roomId == null) return;
+
+    try {
+      await _apiService.clearChatHistory(_roomId!);
+      await _loadMessages();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to clear chat: $e')),
+      );
+    }
   }
 
   Widget _buildMessageInput() {
@@ -198,9 +345,7 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           IconButton(
             icon: Icon(Icons.add, color: AppColors.primary),
-            onPressed: () {
-              // Show attachment options
-            },
+            onPressed: _showAttachmentOptions,
           ),
           Expanded(
             child: TextField(
@@ -229,11 +374,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _messageController.dispose();
-    _scrollController.dispose();
-    _focusNode.dispose();
-    super.dispose();
+  void _showAttachmentOptions() {
+    // Implement attachment options
   }
 }

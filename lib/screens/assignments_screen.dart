@@ -1,91 +1,51 @@
-// lib/screens/assignments_screen.dart
 import 'package:flutter/material.dart';
 import '../models/assignment_model.dart';
+import '../services/api_service.dart';
 import '../utils/app_design_system.dart';
 import '../utils/theme.dart';
 import 'assignment_detail_screen.dart';
-
+import 'package:app/services/api_service.dart';
 class AssignmentsScreen extends StatefulWidget {
-  const AssignmentsScreen({super.key});
+  final String studentRfid;
+
+  const AssignmentsScreen({
+    super.key,
+    required this.studentRfid,
+  });
 
   @override
   State<AssignmentsScreen> createState() => _AssignmentsScreenState();
 }
 
 class _AssignmentsScreenState extends State<AssignmentsScreen> {
-  List<Assignment> _assignments = [];
+  late ApiService _apiService;
+  late Future<List<Assignment>> _assignmentsFuture;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _apiService = ApiService();
     _loadAssignments();
   }
 
   Future<void> _loadAssignments() async {
-    // In a real app, this would fetch from API
-    await Future.delayed(const Duration(seconds: 1));
-
     setState(() {
-      _assignments = [
-        Assignment(
-          id: '1',
-          subject: 'Mathematics',
-          title: 'Linear Algebra Homework',
-          description:
-              'Solve problems 1-10 from chapter 3. Show all your work.',
-          dueDate: DateTime.now().add(const Duration(days: 2)),
-          postedDate: DateTime.now().subtract(const Duration(days: 3)),
-          attachments: ['problem_set.pdf'],
-          status: 'active',
-        ),
-        Assignment(
-          id: '2',
-          subject: 'Physics',
-          title: 'Newton\'s Laws Lab Report',
-          description: 'Write a 3-page report on your lab experiment results.',
-          dueDate: DateTime.now().add(const Duration(days: 5)),
-          postedDate: DateTime.now().subtract(const Duration(days: 1)),
-          attachments: ['lab_guidelines.pdf'],
-          status: 'active',
-        ),
-        Assignment(
-          id: '3',
-          subject: 'Chemistry',
-          title: 'Periodic Table Quiz',
-          description: 'Complete the online quiz about periodic table trends.',
-          dueDate: DateTime.now().subtract(const Duration(days: 1)),
-          postedDate: DateTime.now().subtract(const Duration(days: 7)),
-          status: 'submitted',
-          submissionFile: 'my_quiz_answers.pdf',
-          submissionDate: DateTime.now().subtract(const Duration(days: 2)),
-        ),
-        Assignment(
-          id: '4',
-          subject: 'History',
-          title: 'World War II Essay',
-          description: '5-page essay on the causes of World War II.',
-          dueDate: DateTime.now().add(const Duration(days: 7)),
-          postedDate: DateTime.now(),
-          attachments: ['essay_rubric.pdf'],
-          status: 'upcoming',
-        ),
-        Assignment(
-          id: '5',
-          subject: 'English',
-          title: 'Shakespeare Sonnet Analysis',
-          description: 'Analyze one of Shakespeare\'s sonnets.',
-          dueDate: DateTime.now().subtract(const Duration(days: 3)),
-          postedDate: DateTime.now().subtract(const Duration(days: 10)),
-          status: 'graded',
-          grade: 88.5,
-          submissionFile: 'sonnet_analysis.docx',
-          submissionDate: DateTime.now().subtract(const Duration(days: 4)),
-          teacherFeedback: 'Good analysis but could go deeper into metaphors.',
-        ),
-      ];
-      _isLoading = false;
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      _assignmentsFuture = _apiService.getAssignments(widget.studentRfid);
+      await _assignmentsFuture;
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load assignments. Please try again.';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -100,42 +60,54 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             colors: [AppColors.primary.withOpacity(0.05), AppColors.background],
           ),
         ),
-        child:
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                  onRefresh: _loadAssignments,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildSectionHeader(
-                        'Due Soon',
-                        _assignments
-                            .where(
-                              (a) =>
-                                  a.dueDate.difference(DateTime.now()).inDays <=
-                                      3 &&
-                                  a.status != 'graded',
-                            )
-                            .toList(),
-                      ),
-                      _buildSectionHeader(
-                        'Recently Graded',
-                        _assignments
-                            .where((a) => a.status == 'graded')
-                            .toList(),
-                      ),
-                      _buildSectionHeader('All Assignments', _assignments),
-                    ],
-                  ),
-                ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+            ? Center(child: Text(_errorMessage!))
+            : RefreshIndicator(
+          onRefresh: _loadAssignments,
+          child: FutureBuilder<List<Assignment>>(
+            future: _assignmentsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final assignments = snapshot.data!;
+                if (assignments.isEmpty) {
+                  return const Center(
+                    child: Text('No assignments found.'),
+                  );
+                }
+
+                final dueSoon = assignments
+                    .where((a) =>
+                a.dueDate.difference(DateTime.now()).inDays <= 3 &&
+                    a.status != 'graded' &&
+                    a.status != 'submitted')
+                    .toList();
+
+                final graded = assignments
+                    .where((a) => a.status == 'graded')
+                    .toList();
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (dueSoon.isNotEmpty)
+                      _buildSectionHeader('Due Soon', dueSoon),
+                    if (graded.isNotEmpty)
+                      _buildSectionHeader('Recently Graded', graded),
+                    _buildSectionHeader('All Assignments', assignments),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildSectionHeader(String title, List<Assignment> assignments) {
-    if (assignments.isEmpty) return const SizedBox();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -155,7 +127,7 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
   }
 
   Widget _buildAssignmentCard(Assignment assignment) {
-    final subjectColor = _getSubjectColor(assignment.subject);
+    final subjectColor = _getSubjectColor(assignment.subjectName);
     final isSubmitted =
         assignment.status == 'submitted' || assignment.status == 'graded';
 
@@ -173,16 +145,13 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
             children: [
               // Subject header with colored tag
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: subjectColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  assignment.subject,
+                  assignment.subjectName,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -227,13 +196,12 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                     Text(
                       assignment.timeLeft,
                       style: TextStyle(
-                        color:
-                            assignment.dueDate
-                                        .difference(DateTime.now())
-                                        .inDays <
-                                    3
-                                ? AppColors.warning
-                                : AppColors.textSecondary,
+                        color: assignment.dueDate
+                            .difference(DateTime.now())
+                            .inDays <
+                            3
+                            ? AppColors.warning
+                            : AppColors.textSecondary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -270,10 +238,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                             assignment.status == 'graded'
                                 ? Icons.grade
                                 : Icons.check_circle,
-                            color:
-                                assignment.status == 'graded'
-                                    ? AppColors.accentAmber
-                                    : AppColors.success,
+                            color: assignment.status == 'graded'
+                                ? AppColors.accentAmber
+                                : AppColors.success,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -283,10 +250,9 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                                 : 'SUBMITTED',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color:
-                                  assignment.status == 'graded'
-                                      ? AppColors.accentAmber
-                                      : AppColors.success,
+                              color: assignment.status == 'graded'
+                                  ? AppColors.accentAmber
+                                  : AppColors.success,
                             ),
                           ),
                         ],
@@ -311,9 +277,10 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
                       color: AppColors.textSecondary,
                     ),
                     ...assignment.attachments.map(
-                      (file) => Chip(
-                        label: Text(file, style: const TextStyle(fontSize: 12)),
-                        backgroundColor: AppColors.lightGrey,
+                          (file) => Chip(
+                            label: Text(file.fileName, style: const TextStyle(fontSize: 12)),
+
+                            backgroundColor: AppColors.lightGrey,
                       ),
                     ),
                   ],
@@ -357,35 +324,66 @@ class _AssignmentsScreenState extends State<AssignmentsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => AssignmentDetailScreen(
-              assignment: assignment,
-              onSubmission: (file) => _handleSubmission(assignment, file),
-            ),
+        builder: (context) => AssignmentDetailScreen(
+          assignment: assignment,
+          StudentRfid: widget.studentRfid,
+          onSubmission: (file) => _handleSubmission(assignment, file),
+
+          onStatusUpdate: (newStatus) => _updateAssignmentStatus(assignment, newStatus),
+        ),
       ),
     );
   }
 
-  void _handleSubmission(Assignment assignment, String file) {
-    setState(() {
-      _assignments =
-          _assignments.map((a) {
-            if (a.id == assignment.id) {
-              return Assignment(
-                id: a.id,
-                subject: a.subject,
-                title: a.title,
-                description: a.description,
-                dueDate: a.dueDate,
-                postedDate: a.postedDate,
-                attachments: a.attachments,
-                status: 'submitted',
-                submissionFile: file,
-                submissionDate: DateTime.now(),
-              );
-            }
-            return a;
-          }).toList();
-    });
+  Future<void> _handleSubmission(Assignment assignment, String file) async {
+    try {
+      final updatedAssignment = await _apiService.submitAssignment(
+        assignmentId: assignment.id,
+        fileName: 'submission_${assignment.id}.pdf',
+        filePath: file,
+        studentRfid: widget.studentRfid,
+      );
+
+      setState(() {
+        _assignmentsFuture = _apiService.getAssignments(widget.studentRfid);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Assignment submitted successfully!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit: ${e.toString()}')),
+      );
+    }
+  }
+
+  Future<void> _updateAssignmentStatus(Assignment assignment, String newStatus) async {
+    try {
+      // 1. Update locally in your state
+      setState(() {
+        assignment.status = newStatus;
+        if (newStatus == 'submitted') {
+          assignment.submissionDate = DateTime.now();
+        }
+      });
+
+      // 2. Call API to update status on server
+      await _apiService.updateAssignmentStatus(
+        assignmentId: assignment.id,
+        status: newStatus,
+      );
+
+      // 3. Refresh assignments list
+      _loadAssignments();
+    } catch (e) {
+      // Revert local change if API call fails
+      setState(() {
+        assignment.status = assignment.status; // Revert to previous status
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
+      );
+    }
   }
 }

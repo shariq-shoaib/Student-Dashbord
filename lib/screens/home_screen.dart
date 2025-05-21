@@ -20,9 +20,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final NotificationService _notificationService = NotificationService();
 
   final List<Widget> _pages = [
-    AttendanceScreen(),
-    AssignmentsScreen(),
-    const HomeScreenContent(),
+    AttendanceScreen(rfid:'6323678'),
+    AssignmentsScreen(studentRfid: '6323678'),
+    const HomeScreenContent(rfid: '6323678'),
     ChatRoomsScreen(),
     SettingsScreen(),
   ];

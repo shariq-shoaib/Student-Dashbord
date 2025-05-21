@@ -1,48 +1,56 @@
-// lib/screens/queries_screen.dart
 import 'package:flutter/material.dart';
 import '../models/query_model.dart';
+import '../models/subject_model.dart';
+import '../services/api_service.dart';
 import '../utils/app_design_system.dart';
 import '../utils/theme.dart';
 
 class QueriesScreen extends StatefulWidget {
-  const QueriesScreen({super.key});
+  final String studentRfid;
+
+  const QueriesScreen({
+    super.key,
+    required this.studentRfid,
+  });
 
   @override
   State<QueriesScreen> createState() => _QueriesScreenState();
 }
 
 class _QueriesScreenState extends State<QueriesScreen> {
-  final List<Query> _queries = [
-    Query(
-      id: '1',
-      subject: 'Mathematics',
-      question: 'How to solve problem 5 in chapter 3?',
-      answer: 'Use the quadratic formula as shown in example 2.',
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-    ),
-    Query(
-      id: '2',
-      subject: 'Physics',
-      question: 'What is the formula for momentum?',
-      answer: 'Momentum (p) = mass (m) × velocity (v)',
-      timestamp: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    Query(
-      id: '3',
-      subject: 'Chemistry',
-      question: 'How to balance this chemical equation?',
-      timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-    ),
-  ];
+  late ApiService _apiService;
+  late Future<List<Query>> _queriesFuture;
+  late Future<List<Subject>> _subjectsFuture;
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<String> _subjects = [
-    'Mathematics',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'English',
-    'History',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _apiService = ApiService();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      _subjectsFuture = _apiService.getSubjectsByStudentRfid("6323678");
+      _queriesFuture = _apiService.getQueries(widget.studentRfid);
+
+      await Future.wait([_subjectsFuture, _queriesFuture]);
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load data. Please try again.';
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,29 +64,44 @@ class _QueriesScreenState extends State<QueriesScreen> {
             colors: [AppColors.primary.withOpacity(0.05), AppColors.background],
           ),
         ),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _queries.length,
-                itemBuilder: (context, index) {
-                  final query = _queries[index];
-                  return _buildQueryCard(context, query);
-                },
-              ),
-            ),
-          ],
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+            ? Center(child: Text(_errorMessage!))
+            : RefreshIndicator(
+          onRefresh: _loadData,
+          child: FutureBuilder<List<Query>>(
+            future: _queriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final queries = snapshot.data!;
+                if (queries.isEmpty) {
+                  return const Center(
+                    child: Text('No queries yet. Ask your first question!'),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: queries.length,
+                  itemBuilder: (context, index) {
+                    final query = queries[index];
+                    return _buildQueryCard(context, query);
+                  },
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showNewQueryDialog,
+        onPressed: () => _showNewQueryDialog(context),
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
-
+  
   Widget _buildQueryCard(BuildContext context, Query query) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -93,10 +116,7 @@ class _QueriesScreenState extends State<QueriesScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: _getSubjectColor(query.subject),
                   borderRadius: BorderRadius.circular(20),
@@ -113,9 +133,9 @@ class _QueriesScreenState extends State<QueriesScreen> {
               const SizedBox(height: 12),
               Text(
                 query.question,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 12),
               if (query.answer != null) ...[
@@ -183,7 +203,10 @@ class _QueriesScreenState extends State<QueriesScreen> {
               const SizedBox(height: 8),
               Text(
                 query.timeAgo,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -204,12 +227,14 @@ class _QueriesScreenState extends State<QueriesScreen> {
     return colors[subject] ?? AppColors.primary;
   }
 
-  void _showNewQueryDialog() {
-    String? selectedSubject;
+  Future<void> _showNewQueryDialog(BuildContext context) async {
+    String? selectedSubjectId;
     final TextEditingController questionController = TextEditingController();
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
-    showDialog(
+    final subjects = await _subjectsFuture;
+
+    await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -226,7 +251,7 @@ class _QueriesScreenState extends State<QueriesScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: selectedSubject,
+                        value: selectedSubjectId,
                         decoration: InputDecoration(
                           labelText: 'Select Subject',
                           border: OutlineInputBorder(
@@ -237,21 +262,17 @@ class _QueriesScreenState extends State<QueriesScreen> {
                             vertical: 12,
                           ),
                         ),
-                        items:
-                            _subjects.map((subject) {
-                              return DropdownMenuItem(
-                                value: subject,
-                                child: Text(subject),
-                              );
-                            }).toList(),
-                        validator:
-                            (value) =>
-                                value == null
-                                    ? 'Please select a subject'
-                                    : null,
+                        items: subjects.map((subject) {
+                          return DropdownMenuItem(
+                            value: subject.id,
+                            child: Text(subject.name),
+                          );
+                        }).toList(),
+                        validator: (value) =>
+                        value == null ? 'Please select a subject' : null,
                         onChanged: (value) {
                           setState(() {
-                            selectedSubject = value;
+                            selectedSubjectId = value;
                           });
                         },
                       ),
@@ -266,11 +287,10 @@ class _QueriesScreenState extends State<QueriesScreen> {
                           ),
                           contentPadding: const EdgeInsets.all(16),
                         ),
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Please enter your question'
-                                    : null,
+                        validator: (value) =>
+                        value == null || value.isEmpty
+                            ? 'Please enter your question'
+                            : null,
                       ),
                     ],
                   ),
@@ -282,13 +302,25 @@ class _QueriesScreenState extends State<QueriesScreen> {
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (formKey.currentState!.validate()) {
-                      _submitNewQuery(
-                        selectedSubject!,
-                        questionController.text,
-                      );
-                      Navigator.pop(context);
+                      try {
+                        final newQuery = await _apiService.submitQuery(
+                          subjectId: selectedSubjectId!,
+                          question: questionController.text,
+                          studentRfid: widget.studentRfid
+                        );
+                        Navigator.pop(context);
+                        setState(() {
+                          _queriesFuture = _apiService.getQueries(widget.studentRfid);
+                        });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to submit query: $e'),
+                          ),
+                        );
+                      }
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -306,18 +338,5 @@ class _QueriesScreenState extends State<QueriesScreen> {
         );
       },
     );
-  }
-
-  void _submitNewQuery(String subject, String question) {
-    final newQuery = Query(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      subject: subject,
-      question: question,
-      timestamp: DateTime.now(),
-    );
-
-    setState(() {
-      _queries.insert(0, newQuery);
-    });
   }
 }
